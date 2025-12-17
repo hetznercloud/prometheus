@@ -32,21 +32,25 @@ import (
 )
 
 const (
-	hetznerHcloudLabelPrefix                        = hetznerLabelPrefix + "hcloud_"
-	hetznerLabelHcloudImageName                     = hetznerHcloudLabelPrefix + "image_name"
-	hetznerLabelHcloudImageDescription              = hetznerHcloudLabelPrefix + "image_description"
-	hetznerLabelHcloudImageOSVersion                = hetznerHcloudLabelPrefix + "image_os_version"
-	hetznerLabelHcloudImageOSFlavor                 = hetznerHcloudLabelPrefix + "image_os_flavor"
-	hetznerLabelHcloudPrivateIPv4                   = hetznerHcloudLabelPrefix + "private_ipv4_"
+	hetznerHcloudLabelPrefix           = hetznerLabelPrefix + "hcloud_"
+	hetznerLabelHcloudImageName        = hetznerHcloudLabelPrefix + "image_name"
+	hetznerLabelHcloudImageDescription = hetznerHcloudLabelPrefix + "image_description"
+	hetznerLabelHcloudImageOSVersion   = hetznerHcloudLabelPrefix + "image_os_version"
+	hetznerLabelHcloudImageOSFlavor    = hetznerHcloudLabelPrefix + "image_os_flavor"
+	hetznerLabelHcloudPrivateIPv4      = hetznerHcloudLabelPrefix + "private_ipv4_"
+	hetznerLabelHcloudLocation         = hetznerHcloudLabelPrefix + "location"
+	hetznerLabelHcloudNetworkZone      = hetznerHcloudLabelPrefix + "network_zone"
+	hetznerLabelHcloudCPUCores         = hetznerHcloudLabelPrefix + "cpu_cores"
+	hetznerLabelHcloudCPUType          = hetznerHcloudLabelPrefix + "cpu_type"
+	hetznerLabelHcloudMemoryGB         = hetznerHcloudLabelPrefix + "memory_size_gb"
+	hetznerLabelHcloudDiskGB           = hetznerHcloudLabelPrefix + "disk_size_gb"
+	hetznerLabelHcloudType             = hetznerHcloudLabelPrefix + "server_type"
+	hetznerLabelHcloudLabel            = hetznerHcloudLabelPrefix + "label_"
+	hetznerLabelHcloudLabelPresent     = hetznerHcloudLabelPrefix + "labelpresent_"
+
+	// Label names kept for backward compatibility
 	hetznerLabelHcloudDatacenterLocation            = hetznerHcloudLabelPrefix + "datacenter_location"
 	hetznerLabelHcloudDatacenterLocationNetworkZone = hetznerHcloudLabelPrefix + "datacenter_location_network_zone"
-	hetznerLabelHcloudCPUCores                      = hetznerHcloudLabelPrefix + "cpu_cores"
-	hetznerLabelHcloudCPUType                       = hetznerHcloudLabelPrefix + "cpu_type"
-	hetznerLabelHcloudMemoryGB                      = hetznerHcloudLabelPrefix + "memory_size_gb"
-	hetznerLabelHcloudDiskGB                        = hetznerHcloudLabelPrefix + "disk_size_gb"
-	hetznerLabelHcloudType                          = hetznerHcloudLabelPrefix + "server_type"
-	hetznerLabelHcloudLabel                         = hetznerHcloudLabelPrefix + "label_"
-	hetznerLabelHcloudLabelPresent                  = hetznerHcloudLabelPrefix + "labelpresent_"
 )
 
 // Discovery periodically performs Hetzner Cloud requests. It implements
@@ -98,20 +102,29 @@ func (d *hcloudDiscovery) refresh(ctx context.Context) ([]*targetgroup.Group, er
 			hetznerLabelRole:              model.LabelValue(HetznerRoleHcloud),
 			hetznerLabelServerID:          model.LabelValue(strconv.FormatInt(server.ID, 10)),
 			hetznerLabelServerName:        model.LabelValue(server.Name),
-			hetznerLabelDatacenter:        model.LabelValue(server.Datacenter.Name),
 			hetznerLabelPublicIPv4:        model.LabelValue(server.PublicNet.IPv4.IP.String()),
 			hetznerLabelPublicIPv6Network: model.LabelValue(server.PublicNet.IPv6.Network.String()),
 			hetznerLabelServerStatus:      model.LabelValue(server.Status),
 
-			hetznerLabelHcloudDatacenterLocation:            model.LabelValue(server.Datacenter.Location.Name),
-			hetznerLabelHcloudDatacenterLocationNetworkZone: model.LabelValue(server.Datacenter.Location.NetworkZone),
-			hetznerLabelHcloudType:                          model.LabelValue(server.ServerType.Name),
-			hetznerLabelHcloudCPUCores:                      model.LabelValue(strconv.Itoa(server.ServerType.Cores)),
-			hetznerLabelHcloudCPUType:                       model.LabelValue(server.ServerType.CPUType),
-			hetznerLabelHcloudMemoryGB:                      model.LabelValue(strconv.Itoa(int(server.ServerType.Memory))),
-			hetznerLabelHcloudDiskGB:                        model.LabelValue(strconv.Itoa(server.ServerType.Disk)),
+			hetznerLabelHcloudLocation:    model.LabelValue(server.Location.Name),
+			hetznerLabelHcloudNetworkZone: model.LabelValue(server.Location.NetworkZone),
+			hetznerLabelHcloudType:        model.LabelValue(server.ServerType.Name),
+			hetznerLabelHcloudCPUCores:    model.LabelValue(strconv.Itoa(server.ServerType.Cores)),
+			hetznerLabelHcloudCPUType:     model.LabelValue(server.ServerType.CPUType),
+			hetznerLabelHcloudMemoryGB:    model.LabelValue(strconv.Itoa(int(server.ServerType.Memory))),
+			hetznerLabelHcloudDiskGB:      model.LabelValue(strconv.Itoa(server.ServerType.Disk)),
+
+			// Label names kept for backward compatibility
+			hetznerLabelHcloudDatacenterLocation:            model.LabelValue(server.Location.Name),
+			hetznerLabelHcloudDatacenterLocationNetworkZone: model.LabelValue(server.Location.NetworkZone),
 
 			model.AddressLabel: model.LabelValue(net.JoinHostPort(server.PublicNet.IPv4.IP.String(), strconv.FormatUint(uint64(d.port), 10))),
+		}
+
+		// [hcloud.Server.Datacenter] is deprecated and will be removed after 1 July 2026.
+		// See https://docs.hetzner.cloud/changelog#2025-12-16-phasing-out-datacenters
+		if server.Datacenter != nil { // nolint: staticcheck
+			labels[hetznerLabelDatacenter] = model.LabelValue(server.Datacenter.Name) // nolint: staticcheck
 		}
 
 		if server.Image != nil {
